@@ -2,21 +2,19 @@ const express = require('express');
 const http = require('http');
 const url = require('url');
 const WebSocket = require('ws');
-const crypto = require('crypto');
+const uuid = require('uuid/v4');
 
 const app = express();
 
-function randomId(length=10) {
-  return 'a' + crypto.randomBytes(Math.ceil(length / 2))
-    .toString('hex')
-    .slice(0, length);
+function randomId() {
+  return 'i-' + uuid();
 }
 
 const reqKeys = ['headers', 'rawHeaders', 'readable', 'domain', 'trailers', 'rawTrailers', 'url', 'method', 'upgrade', 'baseUrl', 'originalUrl', 'params', 'query'];
 
 app.use(function (req, res) {
   const connId = url.parse(req.url).path.slice(1);
-  const id = randomId(50);
+  const id = randomId();
 
   const reqObject = {};
   reqKeys.forEach((key) => {
@@ -64,7 +62,7 @@ wss.on('connection', function connection(ws, req) {
     console.log('received: %s', message);
   });
 
-  const connId = randomId(5);
+  const connId = randomId();
   const isConnected = JSON.stringify({status: "connected", id: connId});
 
   connections[connId] = ws;
