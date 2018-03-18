@@ -13,7 +13,7 @@ const reqKeys = ['headers', 'rawHeaders', 'readable', 'domain', 'trailers', 'raw
 
 class SocketProxyServer {
   constructor(opts={}) {
-    this.connections = {};
+    this.connections = new Map();
 
     this.app = this.buildApp();
     this.server = http.createServer(this.app);
@@ -31,38 +31,43 @@ class SocketProxyServer {
   }
 
   handleRequest(req, res) {
-    const connId = url.parse(req.url).path.slice(1);
-    const id = randomId();
+    const hostname = req.headers.host;
+    const connectionId = hostname.split('.')[0];
+
+    const requestId = randomId();
 
     const reqObject = {};
     reqKeys.forEach((key) => {
       reqObject[key] = req[key];
     });
 
-    const wsConn = this.connections[connId];
-    if(wsConn) {
+    const wsConn = this.connections.get(connectionId);
+    if (wsConn) {
       wsConn.send(JSON.stringify({
         type: 'request',
-        connId,
-        id,
+        connectionId,
+        id: requestId,
         request: reqObject}));
 
-      wsConn.on('message', function(msg) {
+      function handleMessage(msg) {
         msg = JSON.parse(msg);
 
-        if(msg.id !== id) { return; }
+        if(msg.id !== requestId) { return; }
 
         if(msg.type === 'finish') {
           res.end();
+          wsConn.removeListener('message', handleMessage);
         } else if(msg.type === 'chunk') {
           res.connection.write(msg.chunk);
         } else {
           console.log('do not understand', msg);
         }
-      });
+      }
+
+      wsConn.on('message', handleMessage);
     } else {
       res.writeHead(502, {});
-      res.end(`no server present for ${connId}`);
+      res.end(`no server present for ${connectionId}`);
     }
   }
 
@@ -84,18 +89,19 @@ class SocketProxyServer {
 
       const location = url.parse(req.url, true);
       const host = req.headers.host;
-      //ws.on('message', function incoming(message) {
-      //  console.log('received: %s', message);
-      //});
 
-      const connId = randomId();
+      const connectionId = randomId();
       const isConnected = JSON.stringify({
         type: "status",
         status: "connected",
-        uri: `http://${host}/${connId}`
+        uri: `http://${connectionId}.${host}`
       });
 
-      this.connections[connId] = ws;
+      this.connections.set(connectionId, ws);
+
+      ws.on('close', () => {
+        this.connections.delete(connectionId);
+      });
 
       ws.send(isConnected);
     });

@@ -1,4 +1,5 @@
 const express = require('express');
+const url = require('url');
 const SocketProxyServer = require('../server.js');
 const SocketProxy = require('../index.js');
 const request = require('request-promise-native');
@@ -27,9 +28,13 @@ describe('SocketProxy integration', function() {
 
     it('proxies the response', async function() {
       const { uri } = await this.proxy.connect();
+      const { hostname } = url.parse(uri);
 
       const data = await request({
-        uri,
+        uri: 'http://localhost:8080',
+        headers: {
+          host: hostname
+        },
         resolveWithFullResponse: true
       });
 
