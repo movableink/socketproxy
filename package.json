@@ -1,0 +1,15 @@
+{
+  "name": "socketproxy-server",
+  "version": "0.0.1",
+  "description": "Expose a local webserver via a remote subdmoain, over websockets",
+  "main": "index.js",
+  "repository": "https://github.com/movableink/socketproxy-server",
+  "author": "Michael Nutt <michael@nuttnet.net>",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "express": "^4.16.3",
+    "node-mocks-http": "^1.5.8",
+    "ws": "^5.0.0"
+  }
+}
