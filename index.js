@@ -1,75 +1,70 @@
-const express = require('express');
-const http = require('http');
-const url = require('url');
 const WebSocket = require('ws');
-const uuid = require('uuid/v4');
+const http = require('http');
+const Transform = require('stream').Transform;
+const util = require('util');
+const STATUS_CODES = require('http').STATUS_CODES;
 
-const app = express();
+const ServerResponse = http.ServerResponse;
+const Socket = require('net').Socket;
 
-function randomId() {
-  return 'i-' + uuid();
+class SocketProxy {
+  constructor(opts) {
+    this.url = opts.url;
+    this.app = opts.app;
+  }
+
+  connect() {
+    this.ws = new WebSocket(this.url);
+
+    return new Promise((resolve, reject) => {
+      this.ws.on('error', (err) => {
+        reject(err);
+      });
+
+      this.ws.on('message', (data) => {
+        data = JSON.parse(data);
+        if(data.type === 'request') {
+          const socket = new FakeSocket(this.ws, data.id);
+          const req = new http.IncomingMessage(socket);
+          Object.assign(req, data.request);
+
+          const res = new ServerResponse(req);
+          res.assignSocket(socket);
+          res.on('finish', () => {
+            this.ws.send(JSON.stringify({
+              type: 'finish',
+              id: data.id }));
+          });
+
+          this.app.handle(req, res);
+        } else if(data.type === 'status') {
+          resolve(data);
+        } else {
+          console.log('unknown data', data);
+        }
+      });
+    });
+  }
+
+  close() {
+    return this.ws.close();
+  }
 }
 
-const reqKeys = ['headers', 'rawHeaders', 'readable', 'domain', 'trailers', 'rawTrailers', 'url', 'method', 'upgrade', 'baseUrl', 'originalUrl', 'params', 'query'];
-
-app.use(function (req, res) {
-  const connId = url.parse(req.url).path.slice(1);
-  const id = randomId();
-
-  const reqObject = {};
-  reqKeys.forEach((key) => {
-    reqObject[key] = req[key];
-  });
-
-  const wsConn = connections[connId];
-  if(wsConn) {
-    wsConn.send(JSON.stringify({
-      type: 'request',
-      connId,
-      id,
-      request: reqObject}));
-
-    wsConn.on('message', function(msg) {
-      msg = JSON.parse(msg);
-      console.log('app response');
-
-      if(msg.id !== id) { return; }
-
-      if(msg.type === 'end') {
-        res.end(msg.chunk);
-      } else if(msg.type === 'head') {
-        res.writeHead(msg.statusCode, msg.headers);
-      } else if(msg.type === 'chunk') {
-        res.write(msg.chunk);
-      } else {
-        console.log('do not understand', msg);
-      }
-    });
-  } else {
-    res.end(`no connection for ${connId}`);
+class FakeSocket extends Transform {
+  constructor(ws, id) {
+    super({});
+    this.ws = ws;
+    this.id = id;
   }
-});
 
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+  write(chunk, encoding, callback) {
+    this.ws.send(JSON.stringify({
+      type: 'chunk',
+      chunk: chunk.toString(encoding),
+      encoding,
+      id: this.id }));
+  }
+}
 
-const connections = {};
-
-wss.on('connection', function connection(ws, req) {
-
-  const location = url.parse(req.url, true);
-  ws.on('message', function incoming(message) {
-    console.log('received: %s', message);
-  });
-
-  const connId = randomId();
-  const isConnected = JSON.stringify({status: "connected", id: connId});
-
-  connections[connId] = ws;
-
-  ws.send(isConnected);
-});
-
-server.listen(8080, function listening() {
-  console.log('Listening on %d', server.address().port);
-});
+module.exports = SocketProxy;

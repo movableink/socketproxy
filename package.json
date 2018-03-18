@@ -9,8 +9,13 @@
   "private": false,
   "dependencies": {
     "express": "^4.16.3",
-    "node-mocks-http": "^1.5.8",
     "uuid": "^3.2.1",
     "ws": "^5.0.0"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^5.0.4",
+    "request": "^2.85.0",
+    "request-promise-native": "^1.0.5"
   }
 }
