@@ -1,9 +1,9 @@
 {
-  "name": "socketproxy-server",
+  "name": "socketproxy",
   "version": "0.0.1",
   "description": "Expose a local webserver via a remote subdmoain, over websockets",
   "main": "index.js",
-  "repository": "https://github.com/movableink/socketproxy-server",
+  "repository": "https://github.com/movableink/socketproxy",
   "author": "Michael Nutt <michael@nuttnet.net>",
   "license": "MIT",
   "private": false,
