@@ -24,14 +24,15 @@ class SocketProxyServer extends EventEmitter {
     super();
 
     this.opts = opts;
-    this.secure = !!(opts.sslCert || opts.sslKey);
+    this.useCert = !!(opts.sslCert || opts.sslKey);
+    this.secure = opts.secure || this.useCert;
     this.proto = this.secure ? 'https' : 'http';
-    this.wsProto = this.secure ? 'ws' : 'wss';
+    this.wsProto = this.secure ? 'wss' : 'ws';
 
     this.connections = new Map();
     this.app = this.buildApp();
 
-    if(this.secure) {
+    if(this.useCert) {
       this.server = https.createServer({
         key: opts.sslKey,
         cert: opts.sslCert

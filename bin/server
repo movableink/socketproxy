@@ -25,6 +25,10 @@ const argv = optimist
         default: '0.0.0.0/0',
         describe: 'allow http/https requests from this subnet'
       })
+      .options('secure', {
+        default: false,
+        describe: 'send https urls (for use behind ssl proxy)'
+      })
       .argv;
 
 argv.sslCert = argv['ssl-cert'];
