@@ -7,7 +7,7 @@ Motivation: you run a local http-based node app that you want to expose to the w
 SocketProxy comes in two parts:
 
 * The SocketProxy client connects to the SocketProxy server via websockets and receives a public subdomain URL.
-* The SocketProxy server listens on an http/https port, maps the request subdomain to a SocketProxy client, and then proxies the request to the client over websockets.
+* The SocketProxy server listens on an http/https port, maps the request subdomain to a SocketProxy client, and then proxies the http/https request to the SocketProxy client over websockets.
 
 ## Usage
 
