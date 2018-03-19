@@ -1,9 +1,47 @@
 #!/usr/bin/env node
 
 const SocketProxyServer = require('../server.js');
+const optimist = require('optimist');
 
-const proxyServer = new SocketProxyServer();
+const argv = optimist
+      .usage('Usage: $0 --port [num]')
+      .options('port', {
+        default: '80',
+        describe: 'port server listens on'
+      })
+      .options('bind', {
+        default: '0.0.0.0',
+        describe: 'address of interface server listens on'
+      })
+      .options('ssl-cert', {
+        describe: 'ssl certificate',
+        alias: 'sslCert'
+      })
+      .options('ssl-key', {
+        describe: 'ssl key',
+        alias: 'sslKey'
+      })
+      .options('allow-http-subnet', {
+        default: '0.0.0.0/0',
+        describe: 'allow http/https requests from this subnet',
+        alias: 'allowHttpSubnet'
+      })
+      .argv;
 
-proxyServer.listen(8080).then(() => {
-  console.log(`Listening on ${proxyServer.address().port}`);
+if (argv.help) {
+  optimist.showHelp();
+  process.exit();
+}
+
+const proxyServer = new SocketProxyServer(argv);
+
+proxyServer.listen(argv.port, argv.bind).then(() => {
+  const fromSubnet = argv.allowHttpSubnet ? ` from ${argv.allowHttpSubnet}` : '';
+
+  console.log(`Listening for websockets on ${proxyServer.wsProto}://${argv.bind}:${proxyServer.address().port}`);
+  console.log(`Listening for ${proxyServer.proto} on ${proxyServer.proto}://${argv.bind}:${proxyServer.address().port}${fromSubnet}`);
+});
+
+proxyServer.on('connection', (conn, id) => {
+  console.log('New connection', conn.socket.remoteAddress, id);
 });
