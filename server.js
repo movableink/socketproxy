@@ -152,7 +152,7 @@ class SocketProxyServer extends EventEmitter {
       const isConnected = JSON.stringify({
         type: "status",
         status: "connected",
-        uri: `http://${connectionId}.${host}`
+        uri: `${this.proto}://${connectionId}.${host}`
       });
 
       this.connections.set(connectionId, ws);
