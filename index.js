@@ -30,10 +30,12 @@ class SocketProxy {
 
           const res = new ServerResponse(req);
           res.assignSocket(socket);
+
           res.on('finish', () => {
             this.ws.send(JSON.stringify({
               type: 'finish',
-              id: data.id }));
+              id: data.id
+            }));
           });
 
           this.app.handle(req, res);
@@ -56,14 +58,21 @@ class FakeSocket extends Transform {
     super({});
     this.ws = ws;
     this.id = id;
+    this.totalLength = 0;
   }
 
   write(chunk, encoding, callback) {
+    if (typeof(chunk) === 'string') {
+      chunk = Buffer.from(chunk);
+    }
+
     this.ws.send(JSON.stringify({
       type: 'chunk',
-      chunk: chunk.toString(encoding),
+      chunk: chunk.toString('base64'),
       encoding,
       id: this.id }));
+
+    return true;
   }
 }
 

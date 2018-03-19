@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+
+const SocketProxyServer = require('../server.js');
+
+const proxyServer = new SocketProxyServer();
+
+proxyServer.listen(8080).then(() => {
+  console.log(`Listening on ${proxyServer.address().port}`);
+});

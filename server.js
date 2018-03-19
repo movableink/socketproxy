@@ -42,6 +42,7 @@ class SocketProxyServer {
     });
 
     const wsConn = this.connections.get(connectionId);
+
     if (wsConn) {
       wsConn.send(JSON.stringify({
         type: 'request',
@@ -49,7 +50,7 @@ class SocketProxyServer {
         id: requestId,
         request: reqObject}));
 
-      function handleMessage(msg) {
+      const handleMessage = (msg) => {
         msg = JSON.parse(msg);
 
         if(msg.id !== requestId) { return; }
@@ -58,11 +59,12 @@ class SocketProxyServer {
           res.end();
           wsConn.removeListener('message', handleMessage);
         } else if(msg.type === 'chunk') {
-          res.connection.write(msg.chunk);
+          const buffer = Buffer.from(msg.chunk, 'base64');
+          res.connection.write(buffer, msg.encoding);
         } else {
           console.log('do not understand', msg);
         }
-      }
+      };
 
       wsConn.on('message', handleMessage);
     } else {
@@ -71,8 +73,18 @@ class SocketProxyServer {
     }
   }
 
-  listen() {
-    return this.server.listen(...arguments);
+  listen(port, callback) {
+    return new Promise((resolve, reject) => {
+      return this.server.listen(port, (err) => {
+        if(callback) { callback(err); }
+
+        if(err) {
+          reject(err);
+        } else {
+          resolve(this.server);
+        }
+      });
+    });
   }
 
   close() {
