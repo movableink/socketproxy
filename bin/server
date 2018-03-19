@@ -14,19 +14,20 @@ const argv = optimist
         describe: 'address of interface server listens on'
       })
       .options('ssl-cert', {
-        describe: 'ssl certificate',
-        alias: 'sslCert'
+        describe: 'ssl certificate'
       })
       .options('ssl-key', {
-        describe: 'ssl key',
-        alias: 'sslKey'
+        describe: 'ssl key'
       })
       .options('allow-http-subnet', {
         default: '0.0.0.0/0',
-        describe: 'allow http/https requests from this subnet',
-        alias: 'allowHttpSubnet'
+        describe: 'allow http/https requests from this subnet'
       })
       .argv;
+
+argv.sslCert = argv['ssl-cert'];
+argv.sslKey = argv['ssl-key'];
+argv.allowHttpSubnet = argv['allow-http-subnet'];
 
 if (argv.help) {
   optimist.showHelp();
