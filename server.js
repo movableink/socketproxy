@@ -1,4 +1,5 @@
 const express = require('express');
+const morgan = require('morgan');
 const url = require('url');
 const http = require('http');
 const https = require('https');
@@ -44,6 +45,8 @@ class SocketProxyServer extends EventEmitter {
 
   buildApp() {
     const app = express();
+
+    app.use(morgan('combined', {immediate: true}));
 
     app.use((req, res) => {
       this.handleRequest(req, res);
