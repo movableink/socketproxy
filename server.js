@@ -80,34 +80,35 @@ class SocketProxyServer extends EventEmitter {
 
     const wsConn = this.connections.get(connectionId);
 
-    if (wsConn) {
-      wsConn.send(JSON.stringify({
-        type: 'request',
-        connectionId,
-        id: requestId,
-        request: reqObject}));
-
-      const handleMessage = (msg) => {
-        msg = JSON.parse(msg);
-
-        if(msg.id !== requestId) { return; }
-
-        if(msg.type === 'finish') {
-          res.end();
-          wsConn.removeListener('message', handleMessage);
-        } else if(msg.type === 'chunk') {
-          const buffer = Buffer.from(msg.chunk, 'base64');
-          res.connection.write(buffer, msg.encoding);
-        } else {
-          console.log('do not understand', msg);
-        }
-      };
-
-      wsConn.on('message', handleMessage);
-    } else {
+    if (!wsConn) {
       res.writeHead(502, {});
       res.end(`no server present for ${connectionId}`);
+      return;
     }
+
+    wsConn.send(JSON.stringify({
+      type: 'request',
+      connectionId,
+      id: requestId,
+      request: reqObject}));
+
+    const handleMessage = (msg) => {
+      msg = JSON.parse(msg);
+
+      if(msg.id !== requestId) { return; }
+
+      if(msg.type === 'finish') {
+        res.end();
+        wsConn.removeListener('message', handleMessage);
+      } else if(msg.type === 'chunk') {
+        const buffer = Buffer.from(msg.chunk, 'base64');
+        res.connection.write(buffer, msg.encoding);
+      } else {
+        console.log('do not understand', msg);
+      }
+    };
+
+    wsConn.on('message', handleMessage);
   }
 
   listen(port, bind, callback) {
