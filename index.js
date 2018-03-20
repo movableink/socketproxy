@@ -26,14 +26,7 @@ class SocketProxy {
       const res = new ServerResponse(req);
       res.assignSocket(socket);
 
-      res.on('finish', () => {
-        const responseMessage = ResponseMessage.create({
-          uuid: message.uuid,
-          type: ResponseType.FINISH
-        });
-        const payload = ResponseMessage.encode(responseMessage).finish();
-        this.ws.send(payload);
-      });
+      res.on('finish', () => this.finishResponse(message.uuid));
 
       this.app.handle(req, res);
     } else if(message.connectionInfo) {
@@ -41,6 +34,15 @@ class SocketProxy {
     } else {
       console.log('unknown data', message);
     }
+  }
+
+  finishResponse(uuid) {
+    const responseMessage = ResponseMessage.create({
+      uuid,
+      type: ResponseType.FINISH
+    });
+    const payload = ResponseMessage.encode(responseMessage).finish();
+    this.ws.send(payload);
   }
 
   ping() {
@@ -81,18 +83,17 @@ class SocketProxy {
       });
 
       // First message on connection will be a status message
-      this.ws.once('message', (data) => {
-        const message = RequestMessage.decode(data);
-        if(!message.connectionInfo) { return; }
-        this.savedUri = message.connectionInfo.uri;
-
-        resolve({uri: this.savedUri});
-      });
-
-      this.ws.on('message', (data) => {
-        this.handleMessage(data);
-      });
+      this.ws.once('message', (data) => resolve(this.handleStatus(data)));
+      this.ws.on('message', (data) => this.handleMessage(data));
     });
+  }
+
+  handleStatus(data, resolve) {
+    const message = RequestMessage.decode(data);
+    if(!message.connectionInfo) { return {}; }
+    this.savedUri = message.connectionInfo.uri;
+
+    return { uri: this.savedUri };
   }
 
   close() {

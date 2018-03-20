@@ -23,7 +23,9 @@ const ResponseMessage = root.lookupType('socketproxy.ResponseChunk');
 const ResponseType = ResponseMessage.lookup('MessageType').values;
 
 // Things to serialize from the http IncomingMessage object
-const reqKeys = ['headers', 'rawHeaders', 'readable', 'domain', 'trailers', 'rawTrailers', 'url', 'method', 'upgrade', 'baseUrl', 'originalUrl', 'params', 'query'];
+const reqKeys = ['headers', 'rawHeaders', 'readable', 'domain',
+                 'trailers', 'rawTrailers', 'url', 'method', 'upgrade',
+                 'baseUrl', 'originalUrl', 'params', 'query'];
 
 class SocketProxyServer extends EventEmitter {
   constructor(opts={}) {
@@ -36,6 +38,7 @@ class SocketProxyServer extends EventEmitter {
     this.wsProto = this.secure ? 'wss' : 'ws';
 
     this.connections = new Map();
+    this.responses = new Map();
     this.app = this.buildApp();
 
     if(this.useCert) {
@@ -55,11 +58,26 @@ class SocketProxyServer extends EventEmitter {
 
     app.use(morgan('combined', {immediate: true}));
 
-    app.use((req, res) => {
-      this.handleRequest(req, res);
-    });
+    app.use((req, res) => this.handleRequest(req, res));
 
     return app;
+  }
+
+  handleMessage(data) {
+    const message = ResponseMessage.decode(data);
+
+    if(message.type === ResponseType.PING) { return; }
+
+    const res = this.responses.get(message.uuid);
+    if(!res) { return; }
+
+    if(message.type === ResponseType.FINISH) {
+      res.end();
+    } else if(message.type === ResponseType.CHUNK) {
+      res.connection.write(message.data, message.encoding);
+    } else {
+      console.log('do not understand', message);
+    }
   }
 
   handleRequest(req, res) {
@@ -83,6 +101,9 @@ class SocketProxyServer extends EventEmitter {
 
     const requestId = randomId();
 
+    this.responses.set(requestId, res);
+    res.on('finish', () => this.responses.delete(requestId));
+
     const reqObject = {};
     reqKeys.forEach((key) => {
       reqObject[key] = req[key];
@@ -102,25 +123,6 @@ class SocketProxyServer extends EventEmitter {
     });
     const payload = RequestMessage.encode(requestMessage).finish();
     wsConn.send(payload);
-
-    const handleMessage = (data) => {
-      const message = ResponseMessage.decode(data);
-
-      if(message.uuid !== requestId) { return; }
-
-      if(message.type === ResponseType.FINISH) {
-        res.end();
-        wsConn.removeListener('message', handleMessage);
-      } else if(message.type === ResponseType.CHUNK) {
-        res.connection.write(message.data, message.encoding);
-      } else if(message.type === ResponseType.PING) {
-        // nothing, just ack
-      } else {
-        console.log('do not understand', message);
-      }
-    };
-
-    wsConn.on('message', handleMessage);
   }
 
   listen(port, bind, callback) {
@@ -152,33 +154,35 @@ class SocketProxyServer extends EventEmitter {
 
   buildWebSockets(server) {
     const wss = new WebSocket.Server({ server });
-    wss.on('connection', (ws, req) => {
-      const location = url.parse(req.url, true);
-      const host = req.headers.host;
-
-      const connectionId = randomId();
-
-      const message = RequestMessage.create({
-        uuid: connectionId,
-        connectionInfo: {
-          uri: `${this.proto}://${connectionId}.${host}`
-        }
-      });
-
-      const payloadBuffer = RequestMessage.encode(message).finish();
-      ws.send(payloadBuffer);
-
-      this.connections.set(connectionId, ws);
-
-      ws.on('close', () => {
-        this.connections.delete(connectionId);
-      });
-
-      // mostly for logging purposes
-      this.emit('connection', req, connectionId);
-    });
+    wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
     return wss;
+  }
+
+  handleConnection(ws, req) {
+    const location = url.parse(req.url, true);
+    const host = req.headers.host;
+
+    const connectionId = randomId();
+
+    const message = RequestMessage.create({
+      uuid: connectionId,
+      connectionInfo: {
+        uri: `${this.proto}://${connectionId}.${host}`
+      }
+    });
+
+    const payloadBuffer = RequestMessage.encode(message).finish();
+    ws.send(payloadBuffer);
+
+    this.connections.set(connectionId, ws);
+
+    ws.on('message', (data) => this.handleMessage(data));
+
+    ws.on('close', () => this.connections.delete(connectionId));
+
+    // mostly for logging purposes
+    this.emit('connection', req, connectionId);
   }
 }
 
