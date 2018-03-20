@@ -1,0 +1,45 @@
+package socketproxy;
+syntax = "proto3";
+
+message Request {
+  string uuid = 1;
+
+  oneof data {
+    ConnectionInfo connectionInfo = 2;
+    HttpRequest httpRequest = 3;
+  }
+}
+
+message ConnectionInfo {
+  string uri = 1;
+}
+
+message HttpRequest {
+  map<string, string> headers = 1;
+  repeated string rawHeaders = 2;
+  bool readable = 3;
+  string domain = 4;
+  map<string, string> trailers = 5;
+  repeated string rawTrailers = 6;
+  string url = 7;
+  string method = 8;
+  bool upgrade = 9;
+  string baseUrl = 10;
+  string originalUrl = 11;
+  map<string, string> params = 12;
+  map<string, string> query = 13;
+}
+
+message ResponseChunk {
+  string uuid = 1;
+
+  enum MessageType {
+    CHUNK = 0;
+    FINISH = 2;
+    PING = 3;
+  }
+  MessageType type = 2;
+
+  string encoding = 3;
+  bytes data = 4;
+}

@@ -7,6 +7,7 @@ const WebSocket = require('ws');
 const uuid = require('uuid/v4');
 const EventEmitter = require('events');
 const ip = require('ip');
+const protobuf = require('protobufjs');
 
 function randomId() {
   return 'i-' + uuid();
@@ -15,6 +16,11 @@ function randomId() {
 function connectionIdFromHost(hostname) {
   return hostname && hostname.split('.')[0];
 }
+
+const root = protobuf.loadSync(__dirname + '/schemas/proxy.proto');
+const RequestMessage = root.lookupType('socketproxy.Request');
+const ResponseMessage = root.lookupType('socketproxy.ResponseChunk');
+const ResponseType = ResponseMessage.lookup('MessageType').values;
 
 // Things to serialize from the http IncomingMessage object
 const reqKeys = ['headers', 'rawHeaders', 'readable', 'domain', 'trailers', 'rawTrailers', 'url', 'method', 'upgrade', 'baseUrl', 'originalUrl', 'params', 'query'];
@@ -90,25 +96,27 @@ class SocketProxyServer extends EventEmitter {
       return;
     }
 
-    wsConn.send(JSON.stringify({
-      type: 'request',
-      connectionId,
-      id: requestId,
-      request: reqObject}));
+    const requestMessage = RequestMessage.create({
+      uuid: requestId,
+      httpRequest: reqObject
+    });
+    const payload = RequestMessage.encode(requestMessage).finish();
+    wsConn.send(payload);
 
-    const handleMessage = (msg) => {
-      msg = JSON.parse(msg);
+    const handleMessage = (data) => {
+      const message = ResponseMessage.decode(data);
 
-      if(msg.id !== requestId) { return; }
+      if(message.uuid !== requestId) { return; }
 
-      if(msg.type === 'finish') {
+      if(message.type === ResponseType.FINISH) {
         res.end();
         wsConn.removeListener('message', handleMessage);
-      } else if(msg.type === 'chunk') {
-        const buffer = Buffer.from(msg.chunk, 'base64');
-        res.connection.write(buffer, msg.encoding);
+      } else if(message.type === ResponseType.CHUNK) {
+        res.connection.write(message.data, message.encoding);
+      } else if(message.type === ResponseType.PING) {
+        // nothing, just ack
       } else {
-        console.log('do not understand', msg);
+        console.log('do not understand', message);
       }
     };
 
@@ -149,11 +157,16 @@ class SocketProxyServer extends EventEmitter {
       const host = req.headers.host;
 
       const connectionId = randomId();
-      const isConnected = JSON.stringify({
-        type: "status",
-        status: "connected",
-        uri: `${this.proto}://${connectionId}.${host}`
+
+      const message = RequestMessage.create({
+        uuid: connectionId,
+        connectionInfo: {
+          uri: `${this.proto}://${connectionId}.${host}`
+        }
       });
+
+      const payloadBuffer = RequestMessage.encode(message).finish();
+      ws.send(payloadBuffer);
 
       this.connections.set(connectionId, ws);
 
@@ -161,7 +174,7 @@ class SocketProxyServer extends EventEmitter {
         this.connections.delete(connectionId);
       });
 
-      ws.send(isConnected);
+      // mostly for logging purposes
       this.emit('connection', req, connectionId);
     });
 

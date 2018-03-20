@@ -7,11 +7,15 @@
   "author": "Michael Nutt <michael@nuttnet.net>",
   "license": "MIT",
   "private": false,
+  "scripts": {
+    "test": "yarn run mocha"
+  },
   "dependencies": {
     "express": "^4.16.3",
     "ip": "^1.1.5",
     "morgan": "^1.9.0",
     "optimist": "^0.6.1",
+    "protobufjs": "^6.8.6",
     "uuid": "^3.2.1",
     "ws": "^5.0.0"
   },
