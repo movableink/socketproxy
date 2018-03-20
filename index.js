@@ -1,10 +1,8 @@
+const { IncomingMessage, ServerResponse } = require('http');
+const { Transform } = require('stream');
+const { Socket } = require('net');
 const WebSocket = require('ws');
-const http = require('http');
-const Transform = require('stream').Transform;
 const protobuf = require('protobufjs');
-
-const ServerResponse = http.ServerResponse;
-const Socket = require('net').Socket;
 
 const root = protobuf.loadSync(__dirname + '/schemas/proxy.proto');
 const RequestMessage = root.lookupType('socketproxy.Request');
@@ -19,11 +17,10 @@ class SocketProxy {
 
   handleMessage(data) {
     const message = RequestMessage.decode(data);
-    //console.log('message', message);
 
     if(message.httpRequest) {
       const socket = new FakeSocket(this.ws, message.uuid);
-      const req = new http.IncomingMessage(socket);
+      const req = new IncomingMessage(socket);
       Object.assign(req, message.httpRequest);
 
       const res = new ServerResponse(req);
