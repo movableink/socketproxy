@@ -41,6 +41,16 @@ describe('SocketProxy integration', function() {
 
       expect(data.body).to.equal("GOT IT");
     });
+
+    it('has a health check', async function() {
+      const data = await request({
+        url: 'http://localhost:8080/health',
+        resolveWithFullResponse: true
+      });
+
+      expect(data.body).to.equal('Healthy');
+      expect(data.statusCode).to.equal(200);
+    })
   });
 
   describe('app sends image', function() {
