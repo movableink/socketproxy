@@ -56,7 +56,7 @@ class SocketProxyServer extends EventEmitter {
   buildApp() {
     const app = express();
 
-    app.use(morgan('combined', {immediate: true}));
+    app.use(morgan('combined'));
     app.get('/health', function (req, res) {
       res.statusCode = 200;
       res.end('Healthy');
