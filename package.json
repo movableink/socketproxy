@@ -11,13 +11,14 @@
     "test": "yarn run mocha"
   },
   "dependencies": {
-    "express": "^4.16.4",
+    "express": "^4.17.1",
     "ip": "^1.1.5",
-    "morgan": "^1.9.1",
+    "morgan": "^1.10.0",
     "optimist": "^0.6.1",
-    "protobufjs": "^6.8.8",
-    "uuid": "^3.3.2",
-    "ws": "^6.2.1"
+    "protobufjs": "^6.9.0",
+    "type-is": "^1.6.18",
+    "uuid": "^8.1.0",
+    "ws": "^7.3.0"
   },
   "keywords": [
     "proxy",
@@ -28,9 +29,9 @@
     "socketproxy-server": "./bin/server"
   },
   "devDependencies": {
-    "chai": "^4.1.2",
-    "mocha": "^5.0.4",
-    "request": "^2.85.0",
-    "request-promise-native": "^1.0.5"
+    "chai": "^4.2.0",
+    "mocha": "^7.2.0",
+    "request": "^2.88.2",
+    "request-promise-native": "^1.0.8"
   }
 }

@@ -8,21 +8,17 @@ const { expect } = require('chai');
 
 describe('SocketProxy integration', function() {
   describe('simple response', function() {
-    before(async function() {
+    beforeEach(async function() {
       this.proxyServer = new SocketProxyServer();
 
       await this.proxyServer.listen(8080);
 
       this.app = express();
 
-      this.app.use(function(req, res) {
-        res.send("GOT IT");
-      });
-
       this.proxy = new SocketProxy({url: 'ws://localhost:8080', app: this.app});
     });
 
-    after(async function() {
+    afterEach(async function() {
       await this.proxy.close();
       await this.proxyServer.close();
     });
@@ -31,11 +27,11 @@ describe('SocketProxy integration', function() {
       const { uri } = await this.proxy.connect();
       const { hostname } = url.parse(uri);
 
+      this.app.use((_, res) => res.send("GOT IT"));
+
       const data = await request({
         uri: 'http://localhost:8080',
-        headers: {
-          host: hostname
-        },
+        headers: { host: hostname },
         resolveWithFullResponse: true
       });
 
@@ -50,11 +46,31 @@ describe('SocketProxy integration', function() {
 
       expect(data.body).to.equal('Healthy');
       expect(data.statusCode).to.equal(200);
-    })
+    });
+
+    it('supports POST body', async function() {
+      const { uri } = await this.proxy.connect();
+      const { hostname } = url.parse(uri);
+
+      this.app.post('/foo', (req, res) => {
+        const body = JSON.parse(req.body);
+        res.send(JSON.stringify(body));
+      });
+
+      const data = await request({
+        method: 'POST',
+        body: JSON.stringify({ foo: true }),
+        uri: 'http://localhost:8080/foo',
+        headers: { host: hostname, 'content-type': 'application/json' },
+        resolveWithFullResponse: true
+      });
+
+      expect(JSON.parse(data.body)).to.deep.equal({ foo: true });
+    });
   });
 
   describe('app sends image', function() {
-    before(async function() {
+    beforeEach(async function() {
       this.proxyServer = new SocketProxyServer();
 
       await this.proxyServer.listen(8080);
@@ -69,7 +85,7 @@ describe('SocketProxy integration', function() {
       this.proxy = new SocketProxy({url: 'ws://localhost:8080', app: this.app});
     });
 
-    after(async function() {
+    afterEach(async function() {
       await this.proxy.close();
       await this.proxyServer.close();
     });

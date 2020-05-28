@@ -4,10 +4,11 @@ const url = require('url');
 const http = require('http');
 const https = require('https');
 const WebSocket = require('ws');
-const uuid = require('uuid/v4');
+const { v4: uuid } = require('uuid');
 const EventEmitter = require('events');
 const ip = require('ip');
 const protobuf = require('protobufjs');
+const typeis = require('type-is')
 
 function randomId() {
   return 'i-' + uuid();
@@ -57,10 +58,14 @@ class SocketProxyServer extends EventEmitter {
     const app = express();
 
     app.use(morgan('combined'));
+
+    app.use(express.text({ type: '*/*' }));
+
     app.get('/health', function (req, res) {
       res.statusCode = 200;
       res.end('Healthy');
     });
+
     app.use((req, res) => this.handleRequest(req, res));
 
     return app;
@@ -112,6 +117,10 @@ class SocketProxyServer extends EventEmitter {
       reqObject[key] = req[key];
     });
 
+    if (typeis.hasBody(req)) {
+      reqObject.body = req.body;
+    }
+
     const wsConn = this.connections.get(connectionId);
 
     if (!wsConn) {
@@ -125,6 +134,7 @@ class SocketProxyServer extends EventEmitter {
       httpRequest: reqObject
     });
     const payload = RequestMessage.encode(requestMessage).finish();
+
     wsConn.send(payload);
   }
 

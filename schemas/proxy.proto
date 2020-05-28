@@ -28,6 +28,7 @@ message HttpRequest {
   string originalUrl = 11;
   map<string, string> params = 12;
   map<string, string> query = 13;
+  optional string body = 14;
 }
 
 message ResponseChunk {
