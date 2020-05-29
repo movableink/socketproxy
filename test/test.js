@@ -4,7 +4,18 @@ const path = require('path');
 const SocketProxyServer = require('../server.js');
 const SocketProxy = require('../index.js');
 const request = require('request-promise-native');
+const WebSocket = require('ws');
 const { expect } = require('chai');
+
+function defer() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { resolve, reject, promise };
+}
 
 describe('SocketProxy integration', function() {
   describe('simple response', function() {
@@ -66,6 +77,49 @@ describe('SocketProxy integration', function() {
       });
 
       expect(JSON.parse(data.body)).to.deep.equal({ foo: true });
+    });
+  });
+
+  describe('proxying websocket connections', function() {
+    beforeEach(async function() {
+      this.proxyServer = new SocketProxyServer();
+
+      await this.proxyServer.listen(8080);
+
+      this.proxy = new SocketProxy({url: 'ws://localhost:8080', app: express() });
+    })
+
+    afterEach(async function() {
+      await this.proxy.close();
+      await this.proxyServer.close();
+    });
+
+    it('the proxy and receive web socket messages', async function() {
+      const { connectionId } = await this.proxy.connect();
+      const { promise, resolve } = defer();
+
+      const client = new WebSocket(`ws://localhost:8080?connectionId=${connectionId}`);
+
+      client.on('open', () => this.proxy.send({ message: 'HELLO WORLD' }));
+
+      client.on('message', data => {
+        expect(JSON.parse(data)).to.deep.eq({ message: 'HELLO WORLD' });
+        resolve();
+      });
+
+      await promise;
+    });
+
+    it('will auto-close connections with an invalid connection id', async function() {
+      await this.proxy.connect();
+      const { promise, resolve } = defer();
+
+      const client = new WebSocket(`ws://localhost:8080/ws?connectionId=1203984`);
+
+      client.on('message', data => expect(JSON.parse(data)).to.deep.eq({ error: 'Invalid connectionId' }));
+      client.on('close', () => resolve());
+
+      await promise;
     });
   });
 

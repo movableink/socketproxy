@@ -9,6 +9,7 @@ const EventEmitter = require('events');
 const ip = require('ip');
 const protobuf = require('protobufjs');
 const typeis = require('type-is')
+const CustomConnections = require('./src/custom-connections');
 
 function randomId() {
   return 'i-' + uuid();
@@ -21,6 +22,7 @@ function connectionIdFromHost(hostname) {
 const root = protobuf.loadSync(__dirname + '/schemas/proxy.proto');
 const RequestMessage = root.lookupType('socketproxy.Request');
 const ResponseMessage = root.lookupType('socketproxy.ResponseChunk');
+const ProxyMessage = root.lookupType('socketproxy.ProxyMessage');
 const ResponseType = ResponseMessage.lookup('MessageType').values;
 
 // Things to serialize from the http IncomingMessage object
@@ -40,6 +42,8 @@ class SocketProxyServer extends EventEmitter {
 
     this.connections = new Map();
     this.responses = new Map();
+    this.customClients = new CustomConnections();
+
     this.app = this.buildApp();
 
     if(this.useCert) {
@@ -71,9 +75,7 @@ class SocketProxyServer extends EventEmitter {
     return app;
   }
 
-  handleMessage(data) {
-    const message = ResponseMessage.decode(data);
-
+  handleResponseChunk(message) {
     if(message.type === ResponseType.PING) { return; }
 
     const res = this.responses.get(message.uuid);
@@ -85,6 +87,31 @@ class SocketProxyServer extends EventEmitter {
       res.connection.write(message.data, message.encoding);
     } else {
       console.log('do not understand', message);
+    }
+  }
+
+  handleSocketMessage(message, connectionId) {
+    const clients = this.customClients;
+
+    for (const client of clients.entriesFor(connectionId)) {
+      client.send(message);
+    }
+  }
+
+  handleMessage(data, connectionId) {
+    let message;
+    try {
+      message = ProxyMessage.decode(data);
+    } catch (e) {
+      return;
+    }
+
+    if (message.responseChunk) {
+      return this.handleResponseChunk(message.responseChunk);
+    }
+
+    if (message.webSocketMessage) {
+      return this.handleSocketMessage(message.webSocketMessage.data, connectionId);
     }
   }
 
@@ -172,15 +199,36 @@ class SocketProxyServer extends EventEmitter {
     return wss;
   }
 
+  addCustomConnection(ws, connectionId) {
+    // Ensure there is actually an active connection for the provided
+    // connection ID.
+    if (!connectionId || !this.connections.has(connectionId)) {
+      ws.close();
+      return;
+    }
+
+    const clients = this.customClients;
+
+    clients.add(connectionId, ws);
+
+    ws.on('close', () => clients.delete(connectionId, ws));
+  }
+
   handleConnection(ws, req) {
-    const location = url.parse(req.url, true);
+    const { query } = url.parse(req.url, true);
     const host = req.headers.host;
+
+    if (query.connectionId) {
+      this.addCustomConnection(ws, query.connectionId);
+      return;
+    }
 
     const connectionId = randomId();
 
     const message = RequestMessage.create({
       uuid: connectionId,
       connectionInfo: {
+        connectionId,
         uri: `${this.proto}://${connectionId}.${host}`
       }
     });
@@ -190,9 +238,19 @@ class SocketProxyServer extends EventEmitter {
 
     this.connections.set(connectionId, ws);
 
-    ws.on('message', (data) => this.handleMessage(data));
+    ws.on('message', (data) => this.handleMessage(data, connectionId));
 
-    ws.on('close', () => this.connections.delete(connectionId));
+    ws.on('close', () => {
+      this.connections.delete(connectionId);
+
+      const clients = this.customClients;
+
+      for (const client of clients.entriesFor(connectionId)) {
+        client.close();
+      }
+
+      clients.delete(connectionId)
+    });
 
     // mostly for logging purposes
     this.emit('connection', req, connectionId);
