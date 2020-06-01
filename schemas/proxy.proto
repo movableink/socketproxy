@@ -12,6 +12,12 @@ message Request {
 
 message ConnectionInfo {
   string uri = 1;
+  string connectionId = 2;
+}
+
+message WebSocketMessage {
+  string connectionId = 1;
+  bytes data = 2;
 }
 
 message HttpRequest {
@@ -43,4 +49,11 @@ message ResponseChunk {
 
   string encoding = 3;
   bytes data = 4;
+}
+
+message ProxyMessage {
+  oneof inner_message {
+    ResponseChunk responseChunk = 1;
+    WebSocketMessage webSocketMessage = 2;
+  }
 }
