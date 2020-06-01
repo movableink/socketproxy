@@ -51,8 +51,12 @@ class SocketProxy {
     this._sendProxyMessage({ responseChunk });
   }
 
+  sendJSON(message) {
+    this.send(JSON.stringify(message));
+  }
+
   send(message) {
-    const data = JSON.stringify(message);
+    const data = new TextEncoder("utf-8").encode(message);
     const webSocketMessage = WebSocketMessage.fromObject({ data });
     this._sendProxyMessage({ webSocketMessage });
   }

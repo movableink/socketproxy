@@ -17,7 +17,7 @@ message ConnectionInfo {
 
 message WebSocketMessage {
   string connectionId = 1;
-  string data = 2; // JSON structure needed here.
+  bytes data = 2;
 }
 
 message HttpRequest {
