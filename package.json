@@ -1,6 +1,6 @@
 {
   "name": "@movable/socketproxy",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Expose a local webserver via a remote subdmoain, over websockets",
   "main": "index.js",
   "repository": "https://github.com/movableink/socketproxy",
