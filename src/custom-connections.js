@@ -1,7 +1,5 @@
 class CustomConnections {
-  constructor() {
-    this._collection = new Map();
-  }
+  _collection = new Map();
 
   add(connectionId, socket) {
     const set = this.setFor(connectionId);

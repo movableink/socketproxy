@@ -55,7 +55,8 @@ class SocketProxy {
     this.send(JSON.stringify(message));
   }
 
-  send(data) {
+  send(message) {
+    const data = new TextEncoder("utf-8").encode(message);
     const webSocketMessage = WebSocketMessage.fromObject({ data });
     this._sendProxyMessage({ webSocketMessage });
   }
