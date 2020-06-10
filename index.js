@@ -1,14 +1,13 @@
 const { IncomingMessage, ServerResponse } = require('http');
 const { Transform } = require('stream');
+const { Socket } = require('net');
 const WebSocket = require('ws');
 const protobuf = require('protobufjs');
 
 const root = protobuf.loadSync(__dirname + '/schemas/proxy.proto');
 const RequestMessage = root.lookupType('socketproxy.Request');
-const ResponseChunk = root.lookupType('socketproxy.ResponseChunk');
-const WebSocketMessage = root.lookupType('socketproxy.WebSocketMessage');
-const ProxyMessage = root.lookupType('socketproxy.ProxyMessage');
-const ResponseType = ResponseChunk.lookup('MessageType').values;
+const ResponseMessage = root.lookupType('socketproxy.ResponseChunk');
+const ResponseType = ResponseMessage.lookup('MessageType').values;
 
 class SocketProxy {
   constructor(opts) {
@@ -37,37 +36,23 @@ class SocketProxy {
     }
   }
 
-  _sendProxyMessage(data, cb) {
-    const message = ProxyMessage.fromObject(data);
-    const payload = ProxyMessage.encode(message).finish();
-    this.ws.send(payload, cb);
-  }
-
   finishResponse(uuid) {
-    const responseChunk = ResponseChunk.create({
+    const responseMessage = ResponseMessage.create({
       uuid,
       type: ResponseType.FINISH
     });
-    this._sendProxyMessage({ responseChunk });
-  }
-
-  sendJSON(message) {
-    this.send(JSON.stringify(message));
-  }
-
-  send(data) {
-    const webSocketMessage = WebSocketMessage.fromObject({ data });
-    this._sendProxyMessage({ webSocketMessage });
+    const payload = ResponseMessage.encode(responseMessage).finish();
+    this.ws.send(payload);
   }
 
   ping() {
     return new Promise((resolve, reject) => {
-      const responseMessage = ResponseChunk.create({
+      const responseMessage = ResponseMessage.create({
         type: ResponseType.PING
       });
-      const responseChunk = ResponseChunk.encode(responseMessage).finish();
+      const payload = ResponseMessage.encode(responseMessage).finish();
 
-      this._sendProxyMessage({ responseChunk }, (err) => {
+      this.ws.send(payload, (err) => {
         if(err) {
           reject(err);
         } else {
@@ -103,15 +88,12 @@ class SocketProxy {
     });
   }
 
-  handleStatus(data) {
+  handleStatus(data, resolve) {
     const message = RequestMessage.decode(data);
     if(!message.connectionInfo) { return {}; }
     this.savedUri = message.connectionInfo.uri;
 
-    const connectionId = message.connectionInfo.connectionId;
-    this.connectionId = connectionId;
-
-    return { uri: this.savedUri, connectionId };
+    return { uri: this.savedUri };
   }
 
   close() {
@@ -133,15 +115,13 @@ class FakeSocket extends Transform {
       chunk = Buffer.from(chunk);
     }
 
-    const responseChunk = ResponseChunk.create({
+    const responseMessage = ResponseMessage.create({
       uuid: this.uuid,
       type: ResponseType.CHUNK,
       encoding,
       data: chunk
     });
-
-    const message = ProxyMessage.fromObject({ responseChunk });
-    const payload = ProxyMessage.encode(message).finish();
+    const payload = ResponseMessage.encode(responseMessage).finish();
     this.ws.send(payload);
 
     return true;
