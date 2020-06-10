@@ -100,7 +100,7 @@ describe('SocketProxy integration', function() {
 
       const client = new WebSocket(`ws://localhost:8080?connectionId=${connectionId}`);
 
-      client.on('open', () => this.proxy.sendJSON({ message: 'HELLO WORLD' }));
+      client.on('open', () => this.proxy.send({ message: 'HELLO WORLD' }));
 
       client.on('message', data => {
         expect(JSON.parse(data)).to.deep.eq({ message: 'HELLO WORLD' });
